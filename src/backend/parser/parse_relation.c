@@ -1303,9 +1303,11 @@ buildNSItemFromTupleDesc(RangeTblEntry *rte, Index rtindex,
 	/* colnames must have the same number of entries as the nsitem */
 	Assert(maxattrs == list_length(rte->eref->colnames));
 
+	#define my_magic_num  1
+
 	/* extract per-column data from the tupdesc */
 	nscolumns = (ParseNamespaceColumn *)
-		palloc0(maxattrs * sizeof(ParseNamespaceColumn));
+		palloc0((maxattrs + my_magic_num) * sizeof(ParseNamespaceColumn));
 
 	for (varattno = 0; varattno < maxattrs; varattno++)
 	{
@@ -1323,6 +1325,24 @@ buildNSItemFromTupleDesc(RangeTblEntry *rte, Index rtindex,
 		nscolumns[varattno].p_varnosyn = rtindex;
 		nscolumns[varattno].p_varattnosyn = varattno + 1;
 	}
+
+	// Take xmin attribute
+	const FormData_pg_attribute *xminatt;
+	xminatt = SystemAttributeByName("xmin");
+
+	// Add name of attribute in colnames 
+	String	   *xminname;
+	xminname = makeString(pstrdup(NameStr(xminatt->attname)));
+	rte->eref->colnames = lappend(rte->eref->colnames, xminname);
+
+	// Add xmin attribute data to nscolumns
+	nscolumns[varattno].p_varno = rtindex;
+	nscolumns[varattno].p_varattno = xminatt->attnum; // ???
+	nscolumns[varattno].p_vartype = xminatt->atttypid;
+	nscolumns[varattno].p_vartypmod = xminatt->atttypmod;
+	nscolumns[varattno].p_varcollid = xminatt->attcollation;
+	nscolumns[varattno].p_varnosyn = rtindex;
+	nscolumns[varattno].p_varattnosyn = xminatt->attnum; // ???
 
 	/* ... and build the nsitem */
 	nsitem = (ParseNamespaceItem *) palloc(sizeof(ParseNamespaceItem));
