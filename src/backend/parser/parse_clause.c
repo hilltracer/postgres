@@ -24,6 +24,7 @@
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_type.h"
+#include "catalog/heap.h"
 #include "commands/defrem.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -76,6 +77,8 @@ static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 									 List **namespace);
 static Var *buildVarFromNSColumn(ParseState *pstate,
 								 ParseNamespaceColumn *nscol);
+static Var *buildVarFromSystemColumn(ParseState *pstate,
+									 int rtindex, int attnum);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
 static void markRelsAsNulledBy(ParseState *pstate, Node *n, int jindex);
@@ -1350,11 +1353,40 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					ndx++;
 				}
 				if (l_index < 0)
-					ereport(ERROR,
+				{
+					/* If this column does not exist in the table, 
+					 * try to find it among the system columns
+					 */
+					const FormData_pg_attribute *sysatt;
+					sysatt = SystemAttributeByName(u_colname);
+
+					if (sysatt == NULL)
+					{
+						ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in left table",
 									u_colname)));
-				l_colnos = lappend_int(l_colnos, l_index + 1);
+					}
+					else
+					{
+						/* System column,
+						 * so use predetermined type data to construct Var
+						 */
+						l_colvar = buildVarFromSystemColumn(pstate,
+															l_nsitem->p_rtindex,
+															sysatt->attnum);
+					}														
+				}
+				else
+				{
+					/* Existing column,
+					 * so collect its index and construct the Var
+					 */
+					l_colnos = lappend_int(l_colnos, l_index + 1);
+					l_colvar = buildVarFromNSColumn(pstate,
+												    l_nscolumns + l_index);
+				}
+				
 
 				/* Find it in right input */
 				ndx = 0;
@@ -1374,26 +1406,51 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					ndx++;
 				}
 				if (r_index < 0)
-					ereport(ERROR,
+				{
+					/* If this column does not exist in the table,
+					 * try to find it among the system columns.
+					 */
+					const FormData_pg_attribute *sysatt;
+					sysatt = SystemAttributeByName(u_colname);
+
+					if (sysatt == NULL)
+					{
+						ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
 									u_colname)));
-				r_colnos = lappend_int(r_colnos, r_index + 1);
+					}
+					else
+					{
+						/* System column,
+						 * so use predetermined type data to construct Var
+						 */
+						r_colvar = buildVarFromSystemColumn(pstate,
+															r_nsitem->p_rtindex,
+															sysatt->attnum);
+					}														
+				}
+				else
+				{
+					/* Existing column,
+					 * so collect its index and construct the Var
+					 */
+					r_colnos = lappend_int(r_colnos, r_index + 1);
+					r_colvar = buildVarFromNSColumn(pstate, r_nscolumns + r_index);
 
-				/* Build Vars to use in the generated JOIN ON clause */
-				l_colvar = buildVarFromNSColumn(pstate, l_nscolumns + l_index);
+					/*
+					* While we're here, add column names to the res_colnames
+					* list.  It's a bit ugly to do this here while the
+					* corresponding res_colvars entries are not made till later,
+					* but doing this later would require an additional traversal
+					* of the usingClause list.
+					*/
+					res_colnames = lappend(res_colnames, lfirst(ucol));
+				}
+
+				/* Collect Vars to use in the generated JOIN ON clause */
 				l_usingvars = lappend(l_usingvars, l_colvar);
-				r_colvar = buildVarFromNSColumn(pstate, r_nscolumns + r_index);
 				r_usingvars = lappend(r_usingvars, r_colvar);
-
-				/*
-				 * While we're here, add column names to the res_colnames
-				 * list.  It's a bit ugly to do this here while the
-				 * corresponding res_colvars entries are not made till later,
-				 * but doing this later would require an additional traversal
-				 * of the usingClause list.
-				 */
-				res_colnames = lappend(res_colnames, lfirst(ucol));
 			}
 
 			/* Construct the generated JOIN ON clause */
@@ -1656,6 +1713,40 @@ buildVarFromNSColumn(ParseState *pstate, ParseNamespaceColumn *nscol)
 	markNullableIfNeeded(pstate, var);
 
 	return var;
+}
+
+/*
+ * buildVarFromSystemColumn -
+ *	  build a Var node using "special" attribute, e.g. "xmin".
+ * rtindex is the relation's index in the rangetable.
+ * attnum is the relation's index in the rangetable.
+ * Return NULL if there is no such system attribute.
+ */
+static Var *
+buildVarFromSystemColumn(ParseState *pstate, int rtindex, int attnum)
+{
+	Var		   *var;
+	const FormData_pg_attribute *sysatt;
+
+	sysatt = SystemAttributeDefinition(attnum);
+
+	if (sysatt != NULL)
+	{
+		var = makeVar(rtindex,
+					attnum,
+					sysatt->atttypid,
+					sysatt->atttypmod,
+					sysatt->attcollation,
+					0);
+
+		/* update varnullingrels */
+		markNullableIfNeeded(pstate, var);
+		return var;
+	}
+	else
+	{
+		return NULL;
+	}	
 }
 
 /*
