@@ -1361,21 +1361,16 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					sysatt = SystemAttributeByName(u_colname);
 
 					if (sysatt == NULL)
-					{
 						ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in left table",
 									u_colname)));
-					}
-					else
-					{
-						/* System column,
-						 * so use predetermined type data to construct Var
-						 */
-						l_colvar = buildVarFromSystemColumn(pstate,
-															l_nsitem->p_rtindex,
-															sysatt->attnum);
-					}														
+					/* System column,
+						* so use predetermined type data to construct Var
+						*/
+					l_colvar = buildVarFromSystemColumn(pstate,
+														l_nsitem->p_rtindex,
+														sysatt->attnum);
 				}
 				else
 				{
@@ -1414,21 +1409,16 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					sysatt = SystemAttributeByName(u_colname);
 
 					if (sysatt == NULL)
-					{
 						ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
 									u_colname)));
-					}
-					else
-					{
-						/* System column,
-						 * so use predetermined type data to construct Var
-						 */
-						r_colvar = buildVarFromSystemColumn(pstate,
-															r_nsitem->p_rtindex,
-															sysatt->attnum);
-					}														
+					/* System column,
+						* so use predetermined type data to construct Var
+						*/
+					r_colvar = buildVarFromSystemColumn(pstate,
+														r_nsitem->p_rtindex,
+														sysatt->attnum);
 				}
 				else
 				{
@@ -1730,23 +1720,19 @@ buildVarFromSystemColumn(ParseState *pstate, int rtindex, int attnum)
 
 	sysatt = SystemAttributeDefinition(attnum);
 
-	if (sysatt != NULL)
-	{
-		var = makeVar(rtindex,
-					attnum,
-					sysatt->atttypid,
-					sysatt->atttypmod,
-					sysatt->attcollation,
-					0);
+    if (sysatt == NULL)
+        return NULL;
 
-		/* update varnullingrels */
-		markNullableIfNeeded(pstate, var);
-		return var;
-	}
-	else
-	{
-		return NULL;
-	}	
+    var = makeVar(rtindex,
+                attnum,
+                sysatt->atttypid,
+                sysatt->atttypmod,
+                sysatt->attcollation,
+                0);
+
+    /* update varnullingrels */
+    markNullableIfNeeded(pstate, var);
+    return var;
 }
 
 /*
