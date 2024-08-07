@@ -1313,8 +1313,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				char	   *u_colname = strVal(lfirst(ucol));
 				ListCell   *col;
 				int			ndx;
-				int			l_index = -1;
-				int			r_index = -1;
+				int			l_index;
+				int			r_index;
 				Var		   *l_colvar,
 						   *r_colvar;
 
@@ -1340,21 +1340,24 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 					if (strcmp(l_colname, u_colname) == 0)
 					{
-						if (l_index >= 0)
+						if (ndx != 0)
 							ereport(ERROR,
 									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 									 errmsg("common column name \"%s\" appears more than once in left table",
 											u_colname)));
-						l_index = ndx;
+						ndx = 1;
 					}
 					ndx++;
 				}
-				if (l_index < 0)
+
+				l_colvar = (Var *) scanNSItemForColumn(pstate, 
+													   l_nsitem, 
+													   0, u_colname, 0);
+				if (l_colvar == NULL) 
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in left table",
 									u_colname)));
-				l_colnos = lappend_int(l_colnos, l_index + 1);
 
 				/* Find it in right input */
 				ndx = 0;
@@ -1364,36 +1367,49 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 					if (strcmp(r_colname, u_colname) == 0)
 					{
-						if (r_index >= 0)
+						if (ndx != 0)
 							ereport(ERROR,
 									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 									 errmsg("common column name \"%s\" appears more than once in right table",
 											u_colname)));
-						r_index = ndx;
+						ndx = 1;
 					}
 					ndx++;
 				}
-				if (r_index < 0)
+
+				r_colvar = (Var *) scanNSItemForColumn(pstate,
+											   		   r_nsitem,
+													   0, u_colname, 0);
+
+				if (r_colvar == NULL) 
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
 									u_colname)));
-				r_colnos = lappend_int(r_colnos, r_index + 1);
+
 
 				/* Build Vars to use in the generated JOIN ON clause */
-				l_colvar = buildVarFromNSColumn(pstate, l_nscolumns + l_index);
 				l_usingvars = lappend(l_usingvars, l_colvar);
-				r_colvar = buildVarFromNSColumn(pstate, r_nscolumns + r_index);
 				r_usingvars = lappend(r_usingvars, r_colvar);
 
-				/*
-				 * While we're here, add column names to the res_colnames
-				 * list.  It's a bit ugly to do this here while the
-				 * corresponding res_colvars entries are not made till later,
-				 * but doing this later would require an additional traversal
-				 * of the usingClause list.
-				 */
-				res_colnames = lappend(res_colnames, lfirst(ucol));
+				l_index = l_colvar->varattno;
+				r_index = r_colvar->varattno;
+
+				if (l_index > InvalidAttrNumber && r_index > InvalidAttrNumber)
+				{
+					/* Existing column, so collect indices */					
+					l_colnos = lappend_int(l_colnos, l_index);
+					r_colnos = lappend_int(r_colnos, r_index);
+
+					/*
+					* While we're here, add column names to the res_colnames
+					* list.  It's a bit ugly to do this here while the
+					* corresponding res_colvars entries are not made till later,
+					* but doing this later would require an additional traversal
+					* of the usingClause list.
+					*/
+					res_colnames = lappend(res_colnames, lfirst(ucol));
+				}
 			}
 
 			/* Construct the generated JOIN ON clause */
