@@ -1309,8 +1309,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				char	   *u_colname = strVal(lfirst(ucol));
 				ListCell   *col;
 				int			ndx;
-				int			l_index;
-				int			r_index;
+				int			l_index = -1;
+				int			r_index = -1;
 				Var		   *l_colvar,
 						   *r_colvar;
 
@@ -1336,13 +1336,14 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 					if (strcmp(l_colname, u_colname) == 0)
 					{
-						if (ndx != 0)
+						if (l_index >= 0)
 							ereport(ERROR,
 									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 									 errmsg("common column name \"%s\" appears more than once in left table",
 											u_colname)));
-						ndx = 1;
+						l_index = ndx;
 					}
+					ndx++;
 				}
 
 				l_colvar = (Var *) scanNSItemForColumn(pstate, 
@@ -1362,13 +1363,14 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 					if (strcmp(r_colname, u_colname) == 0)
 					{
-						if (ndx != 0)
+						if (r_index >= 0)
 							ereport(ERROR,
 									(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 									 errmsg("common column name \"%s\" appears more than once in right table",
 											u_colname)));
-						ndx = 1;
+						r_index = ndx;
 					}
+					ndx++;
 				}
 
 				r_colvar = (Var *) scanNSItemForColumn(pstate,
@@ -1386,14 +1388,12 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				l_usingvars = lappend(l_usingvars, l_colvar);
 				r_usingvars = lappend(r_usingvars, r_colvar);
 
-				l_index = l_colvar->varattno;
-				r_index = r_colvar->varattno;
-
-				if (l_index > InvalidAttrNumber && r_index > InvalidAttrNumber)
+				/* Check if the matched columns are existing columns */
+				if (l_index >= 0 && r_index >= 0)
 				{
-					/* Existing column, so collect indices */					
-					l_colnos = lappend_int(l_colnos, l_index);
-					r_colnos = lappend_int(r_colnos, r_index);
+					/* Collect indices */					
+					l_colnos = lappend_int(l_colnos, l_index + 1);
+					r_colnos = lappend_int(r_colnos, r_index + 1);
 
 					/*
 					* While we're here, add column names to the res_colnames
