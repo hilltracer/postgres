@@ -1343,7 +1343,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 											u_colname)));
 						ndx = 1;
 					}
-					ndx++;
 				}
 
 				l_colvar = (Var *) scanNSItemForColumn(pstate, 
@@ -1370,7 +1369,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 											u_colname)));
 						ndx = 1;
 					}
-					ndx++;
 				}
 
 				r_colvar = (Var *) scanNSItemForColumn(pstate,
