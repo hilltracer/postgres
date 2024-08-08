@@ -327,10 +327,6 @@ transformJoinUsingClause(ParseState *pstate,
 		Var		   *rvar = (Var *) lfirst(rvars);
 		A_Expr	   *e;
 
-		/* Require read access to the join variables */
-		markVarForSelectPriv(pstate, lvar);
-		markVarForSelectPriv(pstate, rvar);
-
 		/* Now create the lvar = rvar join condition */
 		e = makeSimpleA_Expr(AEXPR_OP, "=",
 							 (Node *) copyObject(lvar), (Node *) copyObject(rvar),
