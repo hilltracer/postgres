@@ -1347,7 +1347,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 				l_colvar = (Var *) scanNSItemForColumn(pstate, 
 													   l_nsitem, 
-													   0, u_colname, 0);
+													   0, u_colname, -1);
 				if (l_colvar == NULL) 
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
@@ -1373,7 +1373,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 				r_colvar = (Var *) scanNSItemForColumn(pstate,
 											   		   r_nsitem,
-													   0, u_colname, 0);
+													   0, u_colname, -1);
 
 				if (r_colvar == NULL) 
 					ereport(ERROR,
