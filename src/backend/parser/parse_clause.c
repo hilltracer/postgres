@@ -1383,7 +1383,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
 									u_colname)));
 
-
 				/* Build Vars to use in the generated JOIN ON clause */
 				l_usingvars = lappend(l_usingvars, l_colvar);
 				r_usingvars = lappend(r_usingvars, r_colvar);
