@@ -1387,7 +1387,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				l_usingvars = lappend(l_usingvars, l_colvar);
 				r_usingvars = lappend(r_usingvars, r_colvar);
 
-				/* Check if the matched columns are existing columns */
+				/* Check if the matched columns are not system columns */
 				if (l_index >= 0 && r_index >= 0)
 				{
 					/* Collect indices */					
