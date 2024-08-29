@@ -1416,7 +1416,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				 * corresponding res_colvars entries are not made till later,
 				 * but doing this later would require an additional traversal
 				 * of the usingClause list.
-				*/
+				 */
 				res_colnames = lappend(res_colnames, lfirst(ucol));
 
 			}
