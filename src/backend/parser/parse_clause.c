@@ -24,6 +24,7 @@
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_type.h"
+#include "catalog/heap.h"
 #include "commands/defrem.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
@@ -76,6 +77,8 @@ static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 									 List **namespace);
 static Var *buildVarFromNSColumn(ParseState *pstate,
 								 ParseNamespaceColumn *nscol);
+static Var *buildVarFromSystemColumn(ParseState *pstate,
+									 int rtindex, int attnum);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
 static void markRelsAsNulledBy(ParseState *pstate, Node *n, int jindex);
@@ -273,7 +276,12 @@ extractRemainingColumns(ParseState *pstate,
 	prevcols = NULL;
 	foreach(lc, *src_colnos)
 	{
-		prevcols = bms_add_member(prevcols, lfirst_int(lc));
+		int col_index = lfirst_int(lc);
+		if (col_index > 0)
+		{
+			/* User-defined column, so collect it's index. */
+			prevcols = bms_add_member(prevcols, lfirst_int(lc));
+		}
 	}
 
 	attnum = 0;
@@ -1285,9 +1293,12 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		res_colnames = NIL;
 		res_colvars = NIL;
 
+		#define MAGIC_CONSTANT_SYSATTR_NUM 6
 		/* this may be larger than needed, but it's not worth being exact */
 		res_nscolumns = (ParseNamespaceColumn *)
-			palloc0((list_length(l_colnames) + list_length(r_colnames)) *
+			palloc0((list_length(l_colnames) +
+			         list_length(r_colnames) +
+					 MAGIC_CONSTANT_SYSATTR_NUM) *
 					sizeof(ParseNamespaceColumn));
 		res_colindex = 0;
 
@@ -1387,22 +1398,28 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				l_usingvars = lappend(l_usingvars, l_colvar);
 				r_usingvars = lappend(r_usingvars, r_colvar);
 
-				/* Check if the matched columns are not system columns */
-				if (l_index >= 0 && r_index >= 0)
+				if (l_colvar->varattno > 0 && r_colvar->varattno > 0)
 				{
-					/* Collect indices */					
+					/* Matched columns are user-defined columns */					
 					l_colnos = lappend_int(l_colnos, l_index + 1);
 					r_colnos = lappend_int(r_colnos, r_index + 1);
 
-					/*
-					* While we're here, add column names to the res_colnames
-					* list.  It's a bit ugly to do this here while the
-					* corresponding res_colvars entries are not made till later,
-					* but doing this later would require an additional traversal
-					* of the usingClause list.
-					*/
-					res_colnames = lappend(res_colnames, lfirst(ucol));
 				}
+				else
+				{
+					/* Both matched columns are system columns */
+					l_colnos = lappend_int(l_colnos, l_colvar->varattno);
+					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
+				}
+				/*
+				* While we're here, add column names to the res_colnames
+				* list.  It's a bit ugly to do this here while the
+				* corresponding res_colvars entries are not made till later,
+				* but doing this later would require an additional traversal
+				* of the usingClause list.
+				*/
+				res_colnames = lappend(res_colnames, lfirst(ucol));
+
 			}
 
 			/* Construct the generated JOIN ON clause */
@@ -1470,8 +1487,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 			/* Scan the colnos lists to recover info from the previous loop */
 			forboth(lc1, l_colnos, lc2, r_colnos)
 			{
-				int			l_index = lfirst_int(lc1) - 1;
-				int			r_index = lfirst_int(lc2) - 1;
+				int			l_index = lfirst_int(lc1);
+				int			r_index = lfirst_int(lc2);
 				Var		   *l_colvar,
 						   *r_colvar;
 				Node	   *u_colvar;
@@ -1481,9 +1498,24 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				 * Note we re-build these Vars: they might have different
 				 * varnullingrels than the ones made in the previous loop.
 				 */
-				l_colvar = buildVarFromNSColumn(pstate, l_nscolumns + l_index);
-				r_colvar = buildVarFromNSColumn(pstate, r_nscolumns + r_index);
-
+				if (l_index > 0 && r_index > 0)
+				{
+					/* User-defined columns */					
+					l_colvar = buildVarFromNSColumn(pstate,
+												    l_nscolumns + l_index - 1);
+					r_colvar = buildVarFromNSColumn(pstate,
+												    r_nscolumns + r_index - 1);
+				}
+				else
+				{
+					/* System columns, so l_index and r_index are attnums.*/
+					l_colvar = buildVarFromSystemColumn(pstate,
+														l_nsitem->p_rtindex,
+														l_index);
+					r_colvar = buildVarFromSystemColumn(pstate,
+														r_nsitem->p_rtindex,
+														r_index);
+				}
 				/* Construct the join alias Var for this column */
 				u_colvar = buildMergedJoinVar(pstate,
 											  j->jointype,
@@ -1494,15 +1526,17 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				/* Construct column's res_nscolumns[] entry */
 				res_nscolumn = res_nscolumns + res_colindex;
 				res_colindex++;
-				if (u_colvar == (Node *) l_colvar)
+				if ((u_colvar == (Node *) l_colvar) &&
+					(l_index > 0 && r_index > 0))
 				{
 					/* Merged column is equivalent to left input */
-					*res_nscolumn = l_nscolumns[l_index];
+					*res_nscolumn = l_nscolumns[l_index - 1];
 				}
-				else if (u_colvar == (Node *) r_colvar)
+				else if ((u_colvar == (Node *) r_colvar) &&
+						 (l_index > 0 && r_index > 0))
 				{
 					/* Merged column is equivalent to right input */
-					*res_nscolumn = r_nscolumns[r_index];
+					*res_nscolumn = r_nscolumns[r_index - 1];
 				}
 				else
 				{
@@ -1665,6 +1699,36 @@ buildVarFromNSColumn(ParseState *pstate, ParseNamespaceColumn *nscol)
 	markNullableIfNeeded(pstate, var);
 
 	return var;
+}
+
+/*
+ * buildVarFromSystemColumn -
+ *	  build a Var node using "special" attribute, e.g. "xmin".
+ * rtindex is the relation's index in the rangetable.
+ * attnum is the number of "special" attribute.
+ * Return NULL if there is no such system attribute.
+ */
+static Var *
+buildVarFromSystemColumn(ParseState *pstate, int rtindex, int attnum)
+{
+	Var		   *var;
+	const FormData_pg_attribute *sysatt;
+
+	sysatt = SystemAttributeDefinition(attnum);
+
+    if (sysatt == NULL)
+        return NULL;
+
+    var = makeVar(rtindex,
+                attnum,
+                sysatt->atttypid,
+                sysatt->atttypmod,
+                sysatt->attcollation,
+                0);
+
+    /* update varnullingrels */
+    markNullableIfNeeded(pstate, var);
+    return var;
 }
 
 /*
