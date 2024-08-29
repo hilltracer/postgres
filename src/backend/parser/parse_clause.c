@@ -1403,7 +1403,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					/* Matched columns are user-defined columns */					
 					l_colnos = lappend_int(l_colnos, l_index + 1);
 					r_colnos = lappend_int(r_colnos, r_index + 1);
-
 				}
 				else
 				{
@@ -1412,11 +1411,11 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
 				}
 				/*
-				* While we're here, add column names to the res_colnames
-				* list.  It's a bit ugly to do this here while the
-				* corresponding res_colvars entries are not made till later,
-				* but doing this later would require an additional traversal
-				* of the usingClause list.
+				 * While we're here, add column names to the res_colnames
+				 * list.  It's a bit ugly to do this here while the
+				 * corresponding res_colvars entries are not made till later,
+				 * but doing this later would require an additional traversal
+				 * of the usingClause list.
 				*/
 				res_colnames = lappend(res_colnames, lfirst(ucol));
 
