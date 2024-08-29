@@ -1418,7 +1418,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				 * of the usingClause list.
 				 */
 				res_colnames = lappend(res_colnames, lfirst(ucol));
-
 			}
 
 			/* Construct the generated JOIN ON clause */
