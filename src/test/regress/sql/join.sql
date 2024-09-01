@@ -2952,3 +2952,50 @@ SELECT t1.a FROM skip_fetch t1 LEFT JOIN skip_fetch t2 ON t2.a = 1 WHERE t2.a IS
 
 RESET enable_indexonlyscan;
 RESET enable_seqscan;
+
+-- Test join with system columns
+CREATE TABLE j1 (id1 integer);
+CREATE TABLE j2 (id2 integer);
+
+INSERT INTO j1 VALUES (1);
+INSERT INTO j1 VALUES (2);
+INSERT INTO j1 VALUES (3);
+INSERT INTO j2 VALUES (101);
+INSERT INTO j2 VALUES (102);
+-- Add and then remove a record to increment the ctid
+INSERT INTO j2 VALUES (103);
+DELETE FROM j2 WHERE id2 = 103;
+-- Add a third row with an incremented ctid
+INSERT INTO j2 VALUES (104);
+
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2 
+  FROM j1 JOIN j2 ON j1.ctid = j2.ctid;
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 LEFT JOIN j2 ON j1.ctid = j2.ctid;
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 RIGHT JOIN j2 ON j1.ctid = j2.ctid;
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 FULL JOIN j2 ON j1.ctid = j2.ctid;
+
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 JOIN j2 USING (ctid);
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 LEFT JOIN j2 USING (ctid);
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 RIGHT JOIN j2 USING (ctid);
+SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
+  FROM j1 FULL JOIN j2 USING (ctid);
+-- Check if USING can add all system columns at once
+SELECT *
+  FROM j1 JOIN j2 USING (tableoid, xmin, cmin, xmax, cmax, ctid);
+
+-- Test using join exceptions
+SELECT * FROM j1 JOIN j2 USING (id2);
+SELECT * FROM j1 JOIN j2 USING (id1);
+WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
+  SELECT * FROM j1_dubbed JOIN j1 USING (id1);
+WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
+  SELECT * FROM j1 JOIN j1_dubbed USING (id1);
+
+DROP TABLE j1;
+DROP TABLE j2;
