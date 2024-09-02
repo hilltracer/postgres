@@ -1294,12 +1294,11 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		res_colnames = NIL;
 		res_colvars = NIL;
 
-		#define MAGIC_CONSTANT_SYSATTR_NUM 6
 		/* this may be larger than needed, but it's not worth being exact */
 		res_nscolumns = (ParseNamespaceColumn *)
 			palloc0((list_length(l_colnames) +
 			         list_length(r_colnames) +
-					 MAGIC_CONSTANT_SYSATTR_NUM) *
+					 SystemAttributeTotalNumber()) *
 					sizeof(ParseNamespaceColumn));
 		res_colindex = 0;
 
