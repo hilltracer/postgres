@@ -284,7 +284,10 @@ extractRemainingColumns(ParseState *pstate,
 			/* User-defined column, so collect it's index. */
 			prevcols = bms_add_member(prevcols, lfirst_int(lc));
 		}
-		/* We can ignore system columns because they are not in src_colnames */
+		/* 
+		 * If the index is negative, it must not be collected
+		 * because it is a system attribute number.
+		 */
 	}
 
 	attnum = 0;
