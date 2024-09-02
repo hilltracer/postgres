@@ -79,6 +79,8 @@ static Var *buildVarFromNSColumn(ParseState *pstate,
 								 ParseNamespaceColumn *nscol);
 static Var *buildVarFromSystemAttribute(ParseState *pstate,
 									    int rtindex, int attnum);
+static void fillNSColumnParametersFromVar(ParseNamespaceColumn *rescolumn,
+							  			  const Node *colvar);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
 static void markRelsAsNulledBy(ParseState *pstate, Node *n, int jindex);
@@ -1524,17 +1526,33 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				/* Construct column's res_nscolumns[] entry */
 				res_nscolumn = res_nscolumns + res_colindex;
 				res_colindex++;
-				if ((u_colvar == (Node *) l_colvar) &&
-					(l_index > 0 && r_index > 0))
+				if (u_colvar == (Node *) l_colvar)
 				{
 					/* Merged column is equivalent to left input */
-					*res_nscolumn = l_nscolumns[l_index - 1];
+					if (l_index > 0 && r_index > 0)
+					{
+						*res_nscolumn = l_nscolumns[l_index - 1];
+					}
+					else
+					{
+						/* System column, so construct new column.*/
+						fillNSColumnParametersFromVar(res_nscolumn,
+											 		  u_colvar);
+					}
 				}
-				else if ((u_colvar == (Node *) r_colvar) &&
-						 (l_index > 0 && r_index > 0))
+				else if (u_colvar == (Node *) r_colvar)
 				{
 					/* Merged column is equivalent to right input */
-					*res_nscolumn = r_nscolumns[r_index - 1];
+					if (l_index > 0 && r_index > 0)
+					{
+						*res_nscolumn = r_nscolumns[r_index - 1];
+					}
+					else
+					{
+						/* System column, so construct new column.*/
+						fillNSColumnParametersFromVar(res_nscolumn,
+											 		  u_colvar);
+					}
 				}
 				else
 				{
@@ -1702,6 +1720,7 @@ buildVarFromNSColumn(ParseState *pstate, ParseNamespaceColumn *nscol)
 /*
  * buildVarFromSystemAttribute -
  *	  build a Var node using "special" attribute, e.g. "xmin".
+ *
  * rtindex is the relation's index in the rangetable.
  * attnum is the number of "special" attribute.
  * Returns NULL if there is no such system attribute.
@@ -1727,6 +1746,26 @@ buildVarFromSystemAttribute(ParseState *pstate, int rtindex, int attnum)
     /* update varnullingrels */
     markNullableIfNeeded(pstate, var);
     return var;
+}
+
+/*
+ * fillNSColumnParametersFromVar -
+ *	  fill NSColumn parameters using Var data.
+ *
+ * rescolumn is pointer to the NSColumn structure to be filled.
+ * colvar is the Var where to get data from.
+ */
+static void
+fillNSColumnParametersFromVar(ParseNamespaceColumn *rescolumn,
+							  const Node *colvar)
+{
+	rescolumn->p_varno = ((Var *) colvar)->varno;
+	rescolumn->p_varattno = ((Var *) colvar)->varattno;
+	rescolumn->p_vartype = exprType(colvar);
+	rescolumn->p_vartypmod = exprTypmod(colvar);
+	rescolumn->p_varcollid = exprCollation(colvar);
+	rescolumn->p_varnosyn = ((Var *) colvar)->varnosyn;
+	rescolumn->p_varattnosyn = ((Var *) colvar)->varattnosyn;
 }
 
 /*
