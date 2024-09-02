@@ -77,7 +77,7 @@ static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 									 List **namespace);
 static Var *buildVarFromNSColumn(ParseState *pstate,
 								 ParseNamespaceColumn *nscol);
-static Var *buildVarFromSystemColumn(ParseState *pstate,
+static Var *buildVarFromSystemAttribute(ParseState *pstate,
 									 int rtindex, int attnum);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
@@ -1508,10 +1508,10 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				else
 				{
 					/* System columns, so l_index and r_index are attnums.*/
-					l_colvar = buildVarFromSystemColumn(pstate,
+					l_colvar = buildVarFromSystemAttribute(pstate,
 														l_nsitem->p_rtindex,
 														l_index);
-					r_colvar = buildVarFromSystemColumn(pstate,
+					r_colvar = buildVarFromSystemAttribute(pstate,
 														r_nsitem->p_rtindex,
 														r_index);
 				}
@@ -1701,14 +1701,14 @@ buildVarFromNSColumn(ParseState *pstate, ParseNamespaceColumn *nscol)
 }
 
 /*
- * buildVarFromSystemColumn -
+ * buildVarFromSystemAttribute -
  *	  build a Var node using "special" attribute, e.g. "xmin".
  * rtindex is the relation's index in the rangetable.
  * attnum is the number of "special" attribute.
  * Returns NULL if there is no such system attribute.
  */
 static Var *
-buildVarFromSystemColumn(ParseState *pstate, int rtindex, int attnum)
+buildVarFromSystemAttribute(ParseState *pstate, int rtindex, int attnum)
 {
 	Var		   *var;
 	const FormData_pg_attribute *sysatt;
