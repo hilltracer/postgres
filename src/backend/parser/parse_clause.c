@@ -1411,6 +1411,10 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				}
 				else
 				{
+					if (l_colvar->varattno != r_colvar->varattno)
+						elog(ERROR, /* should never happen */
+							 "Incorrect processing of the system columns");
+					
 					/* Both matched columns are system columns */
 					l_colnos = lappend_int(l_colnos, l_colvar->varattno);
 					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
