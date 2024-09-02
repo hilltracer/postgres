@@ -1705,7 +1705,7 @@ buildVarFromNSColumn(ParseState *pstate, ParseNamespaceColumn *nscol)
  *	  build a Var node using "special" attribute, e.g. "xmin".
  * rtindex is the relation's index in the rangetable.
  * attnum is the number of "special" attribute.
- * Return NULL if there is no such system attribute.
+ * Returns NULL if there is no such system attribute.
  */
 static Var *
 buildVarFromSystemColumn(ParseState *pstate, int rtindex, int attnum)
