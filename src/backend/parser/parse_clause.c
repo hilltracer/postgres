@@ -78,7 +78,7 @@ static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 static Var *buildVarFromNSColumn(ParseState *pstate,
 								 ParseNamespaceColumn *nscol);
 static Var *buildVarFromSystemAttribute(ParseState *pstate,
-									 int rtindex, int attnum);
+									    int rtindex, int attnum);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
 static void markRelsAsNulledBy(ParseState *pstate, Node *n, int jindex);
@@ -1508,11 +1508,11 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				{
 					/* System columns, so l_index and r_index are attnums.*/
 					l_colvar = buildVarFromSystemAttribute(pstate,
-														l_nsitem->p_rtindex,
-														l_index);
+														   l_nsitem->p_rtindex,
+														   l_index);
 					r_colvar = buildVarFromSystemAttribute(pstate,
-														r_nsitem->p_rtindex,
-														r_index);
+														   r_nsitem->p_rtindex,
+														   r_index);
 				}
 				/* Construct the join alias Var for this column */
 				u_colvar = buildMergedJoinVar(pstate,
