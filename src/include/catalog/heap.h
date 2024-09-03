@@ -136,7 +136,7 @@ extern const FormData_pg_attribute *SystemAttributeDefinition(AttrNumber attno);
 
 extern const FormData_pg_attribute *SystemAttributeByName(const char *attname);
 
-extern int SystemAttributeTotalNumber(void);
+extern size_t SystemAttributeTotalNumber(void);
 
 extern void CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
 									 int flags);

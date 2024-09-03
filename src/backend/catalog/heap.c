@@ -267,9 +267,9 @@ SystemAttributeByName(const char *attname)
 /*
  * Returns the total number of system attributes.
  */
-int SystemAttributeTotalNumber(void)
+size_t SystemAttributeTotalNumber(void)
 {
-	return (int) lengthof(SysAtt);
+	return lengthof(SysAtt);
 }
 
 

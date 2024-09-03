@@ -78,9 +78,9 @@ static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 static Var *buildVarFromNSColumn(ParseState *pstate,
 								 ParseNamespaceColumn *nscol);
 static Var *buildVarFromSystemAttribute(ParseState *pstate,
-									    int rtindex, int attnum);
+										int rtindex, int attnum);
 static void fillNSColumnParametersFromVar(ParseNamespaceColumn *rescolumn,
-							  			  const Node *colvar);
+										  const Node *colvar);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
 static void markRelsAsNulledBy(ParseState *pstate, Node *n, int jindex);
@@ -278,16 +278,7 @@ extractRemainingColumns(ParseState *pstate,
 	prevcols = NULL;
 	foreach(lc, *src_colnos)
 	{
-		int col_index = lfirst_int(lc);
-		if (col_index > 0)
-		{
-			/* User-defined column, so collect it's index. */
-			prevcols = bms_add_member(prevcols, lfirst_int(lc));
-		}
-		/* 
-		 * If the index is negative, it must not be collected
-		 * because it is a system attribute number.
-		 */
+		prevcols = bms_add_member(prevcols, lfirst_int(lc));
 	}
 
 	attnum = 0;
@@ -1173,6 +1164,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				   *res_colnames,
 				   *l_colnos,
 				   *r_colnos,
+				   *l_colnos_with_sysnos,
+				   *r_colnos_with_sysnos,
 				   *res_colvars;
 		ParseNamespaceColumn *l_nscolumns,
 				   *r_nscolumns,
@@ -1296,13 +1289,15 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		 */
 		l_colnos = NIL;
 		r_colnos = NIL;
+		l_colnos_with_sysnos = NIL;
+		r_colnos_with_sysnos = NIL;
 		res_colnames = NIL;
 		res_colvars = NIL;
 
 		/* this may be larger than needed, but it's not worth being exact */
 		res_nscolumns = (ParseNamespaceColumn *)
 			palloc0((list_length(l_colnames) +
-			         list_length(r_colnames) +
+					 list_length(r_colnames) +
 					 SystemAttributeTotalNumber()) *
 					sizeof(ParseNamespaceColumn));
 		res_colindex = 0;
@@ -1405,7 +1400,15 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 				if (l_colvar->varattno > 0 && r_colvar->varattno > 0)
 				{
-					/* Matched columns are user-defined columns */					
+					/* Matched columns are user-defined columns */
+					l_colnos_with_sysnos = lappend_int(l_colnos_with_sysnos,
+													   l_index);
+					r_colnos_with_sysnos = lappend_int(r_colnos_with_sysnos,
+													   r_index);
+					/* 
+					 * Additionally save the indices in a separate list
+					 * for further processing 
+					 */
 					l_colnos = lappend_int(l_colnos, l_index + 1);
 					r_colnos = lappend_int(r_colnos, r_index + 1);
 				}
@@ -1416,8 +1419,10 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 							 "Incorrect processing of the system columns");
 					
 					/* Both matched columns are system columns */
-					l_colnos = lappend_int(l_colnos, l_colvar->varattno);
-					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
+					l_colnos_with_sysnos = lappend_int(l_colnos_with_sysnos,
+													   l_colvar->varattno);
+					r_colnos_with_sysnos = lappend_int(r_colnos_with_sysnos,
+													   r_colvar->varattno);
 				}
 				/*
 				 * While we're here, add column names to the res_colnames
@@ -1492,7 +1497,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					   *lc2;
 
 			/* Scan the colnos lists to recover info from the previous loop */
-			forboth(lc1, l_colnos, lc2, r_colnos)
+			forboth(lc1, l_colnos_with_sysnos, lc2, r_colnos_with_sysnos)
 			{
 				int			l_index = lfirst_int(lc1);
 				int			r_index = lfirst_int(lc2);
@@ -1505,17 +1510,17 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				 * Note we re-build these Vars: they might have different
 				 * varnullingrels than the ones made in the previous loop.
 				 */
-				if (l_index > 0 && r_index > 0)
+				if (l_index >= 0 && r_index >= 0)
 				{
 					/* User-defined columns */					
 					l_colvar = buildVarFromNSColumn(pstate,
-												    l_nscolumns + l_index - 1);
+												    l_nscolumns + l_index);
 					r_colvar = buildVarFromNSColumn(pstate,
-												    r_nscolumns + r_index - 1);
+												    r_nscolumns + r_index);
 				}
 				else
 				{
-					/* System columns, so l_index and r_index are attnums.*/
+					/* System columns, so l_index and r_index are attnums. */
 					l_colvar = buildVarFromSystemAttribute(pstate,
 														   l_nsitem->p_rtindex,
 														   l_index);
@@ -1536,9 +1541,9 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				if (u_colvar == (Node *) l_colvar)
 				{
 					/* Merged column is equivalent to left input */
-					if (l_index > 0 && r_index > 0)
+					if (l_index >= 0 && r_index >= 0)
 					{
-						*res_nscolumn = l_nscolumns[l_index - 1];
+						*res_nscolumn = l_nscolumns[l_index];
 					}
 					else
 					{
@@ -1550,9 +1555,9 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				else if (u_colvar == (Node *) r_colvar)
 				{
 					/* Merged column is equivalent to right input */
-					if (l_index > 0 && r_index > 0)
+					if (l_index >= 0 && r_index >= 0)
 					{
-						*res_nscolumn = r_nscolumns[r_index - 1];
+						*res_nscolumn = r_nscolumns[r_index];
 					}
 					else
 					{
@@ -1578,6 +1583,9 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				}
 			}
 		}
+
+		list_free(l_colnos_with_sysnos);
+		list_free(r_colnos_with_sysnos);
 
 		/* Add remaining columns from each side to the output columns */
 		res_colindex +=
