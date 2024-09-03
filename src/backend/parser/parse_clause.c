@@ -1400,15 +1400,18 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 				if (l_colvar->varattno > 0 && r_colvar->varattno > 0)
 				{
-					/* Matched columns are user-defined columns */
+					/* 
+					 * Matched columns are user-defined columns.
+					 * Each index is saved in two lists: l_colnos_with_sysnos
+					 * and r_colnos_with_sysnos are used for current processing 
+					 * with system columns. l_colnos and r_colnos are used for
+					 * further processing, where a list with only user-defined
+					 * columns is needed.
+					 */
 					l_colnos_with_sysnos = lappend_int(l_colnos_with_sysnos,
 													   l_index);
 					r_colnos_with_sysnos = lappend_int(r_colnos_with_sysnos,
 													   r_index);
-					/* 
-					 * Additionally save the indices in a separate list
-					 * for further processing 
-					 */
 					l_colnos = lappend_int(l_colnos, l_index + 1);
 					r_colnos = lappend_int(r_colnos, r_index + 1);
 				}
@@ -1547,7 +1550,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					}
 					else
 					{
-						/* System column, so construct new column.*/
+						/* System column, so construct new column. */
 						fillNSColumnParametersFromVar(res_nscolumn,
 											 		  u_colvar);
 					}
@@ -1561,7 +1564,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					}
 					else
 					{
-						/* System column, so construct new column.*/
+						/* System column, so construct new column. */
 						fillNSColumnParametersFromVar(res_nscolumn,
 											 		  u_colvar);
 					}
