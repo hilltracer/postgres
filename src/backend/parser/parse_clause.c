@@ -283,7 +283,7 @@ extractRemainingColumns(ParseState *pstate,
 		{
 			/* 
 			* Attribute number of system column. Don't collect the number
-			* because system column names cannot be among src_colnames.
+			* because the name of this column cannot be among src_colnames.
 			*/
 			continue;
 		}
@@ -1514,11 +1514,11 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				{
 					/* User-defined column */
 					l_colvar = buildVarFromNSColumn(pstate,
-												    l_nscolumns + l_index - 1);
+													l_nscolumns + l_index - 1);
 				}
 				else
 				{
-					/* System column, so l_index and r_index are attnum. */
+					/* System column, so l_index is attnum. */
 					l_colvar = buildVarFromSystemAttribute(pstate,
 														   l_nsitem->p_rtindex,
 														   l_index);
@@ -1527,11 +1527,11 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				{
 					/* User-defined column */
 					r_colvar = buildVarFromNSColumn(pstate,
-												    r_nscolumns + r_index - 1);
+													r_nscolumns + r_index - 1);
 				}
 				else
 				{
-					/* System column, so l_index and r_index are attnum. */
+					/* System column, so r_index is attnum. */
 					r_colvar = buildVarFromSystemAttribute(pstate,
 														   r_nsitem->p_rtindex,
 														   r_index);
@@ -1552,6 +1552,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					/* Merged column is equivalent to left input */
 					if (l_index > 0)
 					{
+						/* User-defined column, so just take it. */
 						*res_nscolumn = l_nscolumns[l_index - 1];
 					}
 					else
@@ -1566,6 +1567,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					/* Merged column is equivalent to right input */
 					if (r_index > 0)
 					{
+						/* User-defined column, so just take it. */
 						*res_nscolumn = r_nscolumns[r_index - 1];
 					}
 					else
