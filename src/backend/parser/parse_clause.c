@@ -278,7 +278,16 @@ extractRemainingColumns(ParseState *pstate,
 	prevcols = NULL;
 	foreach(lc, *src_colnos)
 	{
-		prevcols = bms_add_member(prevcols, lfirst_int(lc));
+		int col_index = lfirst_int(lc);
+		if (col_index < 0)
+		{
+			/* 
+			* Attribute number of system column. Don't collect the number
+			* because system column names cannot be among src_colnames.
+			*/
+			continue;
+		}
+		prevcols = bms_add_member(prevcols, col_index);
 	}
 
 	attnum = 0;
@@ -1164,8 +1173,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				   *res_colnames,
 				   *l_colnos,
 				   *r_colnos,
-				   *l_colnos_with_sysnos,
-				   *r_colnos_with_sysnos,
 				   *res_colvars;
 		ParseNamespaceColumn *l_nscolumns,
 				   *r_nscolumns,
@@ -1289,8 +1296,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		 */
 		l_colnos = NIL;
 		r_colnos = NIL;
-		l_colnos_with_sysnos = NIL;
-		r_colnos_with_sysnos = NIL;
 		res_colnames = NIL;
 		res_colvars = NIL;
 
@@ -1400,18 +1405,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 
 				if (l_colvar->varattno > 0 && r_colvar->varattno > 0)
 				{
-					/* 
-					 * Matched columns are user-defined columns.
-					 * Each index is saved in two lists: l_colnos_with_sysnos
-					 * and r_colnos_with_sysnos are used for current processing 
-					 * with system columns. l_colnos and r_colnos are used for
-					 * further processing, where a list with only user-defined
-					 * columns is needed.
-					 */
-					l_colnos_with_sysnos = lappend_int(l_colnos_with_sysnos,
-													   l_index);
-					r_colnos_with_sysnos = lappend_int(r_colnos_with_sysnos,
-													   r_index);
+					/* Matched columns are user-defined columns */
 					l_colnos = lappend_int(l_colnos, l_index + 1);
 					r_colnos = lappend_int(r_colnos, r_index + 1);
 				}
@@ -1422,10 +1416,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 							 "Incorrect processing of the system columns");
 					
 					/* Both matched columns are system columns */
-					l_colnos_with_sysnos = lappend_int(l_colnos_with_sysnos,
-													   l_colvar->varattno);
-					r_colnos_with_sysnos = lappend_int(r_colnos_with_sysnos,
-													   r_colvar->varattno);
+					l_colnos = lappend_int(l_colnos, l_colvar->varattno);
+					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
 				}
 				/*
 				 * While we're here, add column names to the res_colnames
@@ -1500,7 +1492,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					   *lc2;
 
 			/* Scan the colnos lists to recover info from the previous loop */
-			forboth(lc1, l_colnos_with_sysnos, lc2, r_colnos_with_sysnos)
+			forboth(lc1, l_colnos, lc2, r_colnos)
 			{
 				int			l_index = lfirst_int(lc1);
 				int			r_index = lfirst_int(lc2);
@@ -1513,13 +1505,13 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				 * Note we re-build these Vars: they might have different
 				 * varnullingrels than the ones made in the previous loop.
 				 */
-				if (l_index >= 0 && r_index >= 0)
+				if (l_index > 0 && r_index > 0)
 				{
 					/* User-defined columns */					
 					l_colvar = buildVarFromNSColumn(pstate,
-												    l_nscolumns + l_index);
+												    l_nscolumns + l_index - 1);
 					r_colvar = buildVarFromNSColumn(pstate,
-												    r_nscolumns + r_index);
+												    r_nscolumns + r_index - 1);
 				}
 				else
 				{
@@ -1544,9 +1536,9 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				if (u_colvar == (Node *) l_colvar)
 				{
 					/* Merged column is equivalent to left input */
-					if (l_index >= 0 && r_index >= 0)
+					if (l_index > 0 && r_index > 0)
 					{
-						*res_nscolumn = l_nscolumns[l_index];
+						*res_nscolumn = l_nscolumns[l_index - 1];
 					}
 					else
 					{
@@ -1558,9 +1550,9 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				else if (u_colvar == (Node *) r_colvar)
 				{
 					/* Merged column is equivalent to right input */
-					if (l_index >= 0 && r_index >= 0)
+					if (l_index > 0 && r_index > 0)
 					{
-						*res_nscolumn = r_nscolumns[r_index];
+						*res_nscolumn = r_nscolumns[r_index - 1];
 					}
 					else
 					{
@@ -1586,9 +1578,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				}
 			}
 		}
-
-		list_free(l_colnos_with_sysnos);
-		list_free(r_colnos_with_sysnos);
 
 		/* Add remaining columns from each side to the output columns */
 		res_colindex +=
