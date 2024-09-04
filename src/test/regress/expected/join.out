@@ -8015,8 +8015,8 @@ SELECT t1.a FROM skip_fetch t1 LEFT JOIN skip_fetch t2 ON t2.a = 1 WHERE t2.a IS
 
 RESET enable_indexonlyscan;
 RESET enable_seqscan;
--- Test USING join with system columns
--- Generated 2 tables with 3 rows each.
+-- Test USING with system columns
+-- Generate 2 tables with 3 rows each.
 -- xmin (transaction number) is an integer value represented as T1, T2, etc.
 -- The xmin values of the first and second rows are equal to each other,
 -- respectively. The values T3 and T4 of the third rows are not equal.
@@ -8102,7 +8102,7 @@ SELECT *
 ----------+------+------+------+------+------+-----+-----
 (0 rows)
 
--- Test USING join exceptions
+-- Test USING exceptions
 SELECT * FROM j1 JOIN j2 USING (id2);
 ERROR:  column "id2" specified in USING clause does not exist in left table
 SELECT * FROM j1 JOIN j2 USING (id1);

@@ -2953,9 +2953,9 @@ SELECT t1.a FROM skip_fetch t1 LEFT JOIN skip_fetch t2 ON t2.a = 1 WHERE t2.a IS
 RESET enable_indexonlyscan;
 RESET enable_seqscan;
 
--- Test USING join with system columns
+-- Test USING with system columns
 
--- Generated 2 tables with 3 rows each.
+-- Generate 2 tables with 3 rows each.
 -- xmin (transaction number) is an integer value represented as T1, T2, etc.
 -- The xmin values of the first and second rows are equal to each other,
 -- respectively. The values T3 and T4 of the third rows are not equal.
@@ -2994,7 +2994,7 @@ SELECT j1.id1, j2.id2 FROM j1 FULL JOIN j2 USING (xmin);
 -- Test if USING can add all system columns at once
 SELECT *
   FROM j1 JOIN j2 USING (tableoid, xmin, cmin, xmax, cmax, ctid);
--- Test USING join exceptions
+-- Test USING exceptions
 SELECT * FROM j1 JOIN j2 USING (id2);
 SELECT * FROM j1 JOIN j2 USING (id1);
 WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
