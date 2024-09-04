@@ -1420,11 +1420,6 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
 				}
 
-				if (l_colvar->varattno != r_colvar->varattno)
-					elog(ERROR, /* should never happen */
-							"Incorrect processing of the system columns");
-
-
 				/* Build Vars to use in the generated JOIN ON clause */
 				l_usingvars = lappend(l_usingvars, l_colvar);
 				r_usingvars = lappend(r_usingvars, r_colvar);
