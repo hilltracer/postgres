@@ -3001,6 +3001,10 @@ WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
   SELECT * FROM j1_dubbed JOIN j1 USING (id1);
 WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
   SELECT * FROM j1 JOIN j1_dubbed USING (id1);
+-- Test composite USING
+CREATE TABLE j3 (id3 integer);
+SELECT * FROM j1 JOIN j2 USING (xmin) JOIN j3 USING (xmin) LIMIT 0;
 
 DROP TABLE j1;
 DROP TABLE j2;
+DROP TABLE j3;
