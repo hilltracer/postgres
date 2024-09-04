@@ -1344,6 +1344,13 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 										u_colname)));
 				}
 
+				/*
+				 * It is important to understand that among the l_colnames or
+				 * r_colnames, there may be a system column name. Since a USING 
+				 * join can be composite, a system column name may appear 
+				 * if it was added in the previous step.
+				 */
+
 				/* Find it in left input */
 				ndx = 0;
 				foreach(col, l_colnames)
