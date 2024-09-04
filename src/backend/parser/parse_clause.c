@@ -1370,6 +1370,16 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" specified in USING clause does not exist in left table",
 									u_colname)));
+				if (l_index >= 0)
+				{
+					/* User-defined column */
+					l_colnos = lappend_int(l_colnos, l_index + 1);
+				}
+				else
+				{
+					/* System column */
+					l_colnos = lappend_int(l_colnos, l_colvar->varattno);
+				}
 
 				/* Find it in right input */
 				ndx = 0;
@@ -1399,26 +1409,26 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 							 errmsg("column \"%s\" specified in USING clause does not exist in right table",
 									u_colname)));
 
-				/* Build Vars to use in the generated JOIN ON clause */
-				l_usingvars = lappend(l_usingvars, l_colvar);
-				r_usingvars = lappend(r_usingvars, r_colvar);
-
-				if (l_colvar->varattno > 0 && r_colvar->varattno > 0)
+				if (r_index >= 0)
 				{
-					/* Matched columns are user-defined columns */
-					l_colnos = lappend_int(l_colnos, l_index + 1);
+					/* User-defined column */
 					r_colnos = lappend_int(r_colnos, r_index + 1);
 				}
 				else
 				{
-					if (l_colvar->varattno != r_colvar->varattno)
-						elog(ERROR, /* should never happen */
-							 "Incorrect processing of the system columns");
-					
-					/* Both matched columns are system columns */
-					l_colnos = lappend_int(l_colnos, l_colvar->varattno);
+					/* System column */
 					r_colnos = lappend_int(r_colnos, r_colvar->varattno);
 				}
+
+				if (l_colvar->varattno != r_colvar->varattno)
+					elog(ERROR, /* should never happen */
+							"Incorrect processing of the system columns");
+
+
+				/* Build Vars to use in the generated JOIN ON clause */
+				l_usingvars = lappend(l_usingvars, l_colvar);
+				r_usingvars = lappend(r_usingvars, r_colvar);
+
 				/*
 				 * While we're here, add column names to the res_colnames
 				 * list.  It's a bit ugly to do this here while the
@@ -1505,24 +1515,33 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				 * Note we re-build these Vars: they might have different
 				 * varnullingrels than the ones made in the previous loop.
 				 */
-				if (l_index > 0 && r_index > 0)
+				if (l_index > 0)
 				{
-					/* User-defined columns */					
+					/* User-defined column */
 					l_colvar = buildVarFromNSColumn(pstate,
 												    l_nscolumns + l_index - 1);
+				}
+				else
+				{
+					/* System column, so l_index and r_index are attnum. */
+					l_colvar = buildVarFromSystemAttribute(pstate,
+														   l_nsitem->p_rtindex,
+														   l_index);
+				}
+				if (r_index > 0)
+				{
+					/* User-defined column */
 					r_colvar = buildVarFromNSColumn(pstate,
 												    r_nscolumns + r_index - 1);
 				}
 				else
 				{
-					/* System columns, so l_index and r_index are attnums. */
-					l_colvar = buildVarFromSystemAttribute(pstate,
-														   l_nsitem->p_rtindex,
-														   l_index);
+					/* System column, so l_index and r_index are attnum. */
 					r_colvar = buildVarFromSystemAttribute(pstate,
 														   r_nsitem->p_rtindex,
 														   r_index);
 				}
+
 				/* Construct the join alias Var for this column */
 				u_colvar = buildMergedJoinVar(pstate,
 											  j->jointype,
@@ -1536,7 +1555,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				if (u_colvar == (Node *) l_colvar)
 				{
 					/* Merged column is equivalent to left input */
-					if (l_index > 0 && r_index > 0)
+					if (l_index > 0)
 					{
 						*res_nscolumn = l_nscolumns[l_index - 1];
 					}
@@ -1550,7 +1569,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				else if (u_colvar == (Node *) r_colvar)
 				{
 					/* Merged column is equivalent to right input */
-					if (l_index > 0 && r_index > 0)
+					if (r_index > 0)
 					{
 						*res_nscolumn = r_nscolumns[r_index - 1];
 					}
