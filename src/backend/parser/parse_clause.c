@@ -1751,15 +1751,15 @@ buildVarFromSystemAttribute(ParseState *pstate, int rtindex, int attnum)
 
 	sysatt = SystemAttributeDefinition(attnum);
 
-    if (sysatt == NULL)
-        return NULL;
+	if (sysatt == NULL)
+		return NULL;
 
-    var = makeVar(rtindex,
-                attnum,
-                sysatt->atttypid,
-                sysatt->atttypmod,
-                sysatt->attcollation,
-                0);
+	var = makeVar(rtindex,
+				  attnum,
+				  sysatt->atttypid,
+				  sysatt->atttypmod,
+				  sysatt->attcollation,
+				  0);
 
     /* update varnullingrels */
     markNullableIfNeeded(pstate, var);
