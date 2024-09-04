@@ -2953,43 +2953,48 @@ SELECT t1.a FROM skip_fetch t1 LEFT JOIN skip_fetch t2 ON t2.a = 1 WHERE t2.a IS
 RESET enable_indexonlyscan;
 RESET enable_seqscan;
 
--- Test join with system columns
+-- Test USING join with system columns
+
+-- Generated 2 tables with 3 rows each.
+-- xmin (transaction number) is an integer value represented as T1, T2, etc.
+-- The xmin values of the first and second rows are equal to each other,
+-- respectively. The values T3 and T4 of the third rows are not equal.
+-- J1: id1 | xmin      J2: id2 | xmin  
+--     ----+-------       -----+-------
+--       1 | T1            101 | T1
+--       2 | T2            102 | T2
+--       3 | T3            103 | T4
 CREATE TABLE j1 (id1 integer);
 CREATE TABLE j2 (id2 integer);
+BEGIN;
+  INSERT INTO j1 (id1) VALUES (1);
+  INSERT INTO j2 (id2) VALUES (101);
+COMMIT;
+BEGIN;
+  INSERT INTO j1 (id1) VALUES (2);
+  INSERT INTO j2 (id2) VALUES (102);
+COMMIT;
+BEGIN;
+  INSERT INTO j1 (id1) VALUES (3);
+COMMIT;
+BEGIN;
+  INSERT INTO j2 (id2) VALUES (103);
+COMMIT;
 
-INSERT INTO j1 VALUES (1);
-INSERT INTO j1 VALUES (2);
-INSERT INTO j1 VALUES (3);
-INSERT INTO j2 VALUES (101);
-INSERT INTO j2 VALUES (102);
--- Add and then remove a record to increment the ctid
-INSERT INTO j2 VALUES (103);
-DELETE FROM j2 WHERE id2 = 103;
--- Add a third row with an incremented ctid
-INSERT INTO j2 VALUES (104);
-
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2 
-  FROM j1 JOIN j2 ON j1.ctid = j2.ctid;
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 LEFT JOIN j2 ON j1.ctid = j2.ctid;
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 RIGHT JOIN j2 ON j1.ctid = j2.ctid;
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 FULL JOIN j2 ON j1.ctid = j2.ctid;
-
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 JOIN j2 USING (ctid);
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 LEFT JOIN j2 USING (ctid);
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 RIGHT JOIN j2 USING (ctid);
-SELECT *, j1.ctid AS ctid1, j2.ctid AS ctid2
-  FROM j1 FULL JOIN j2 USING (ctid);
--- Check if USING can add all system columns at once
+-- The xmin values are not output, as they will differ with each run.
+-- So, only the column headers and the values of id1 and id2 are displayed.
+SELECT * FROM j1 JOIN j2 USING (xmin) LIMIT 0;
+SELECT j1.id1, j2.id2 FROM j1 JOIN j2 USING (xmin);
+SELECT * FROM j1 LEFT JOIN j2 USING (xmin) LIMIT 0;
+SELECT j1.id1, j2.id2 FROM j1 LEFT JOIN j2 USING (xmin);
+SELECT * FROM j1 RIGHT JOIN j2 USING (xmin) LIMIT 0;
+SELECT j1.id1, j2.id2 FROM j1 RIGHT JOIN j2 USING (xmin);
+SELECT * FROM j1 FULL JOIN j2 USING (xmin) LIMIT 0;
+SELECT j1.id1, j2.id2 FROM j1 FULL JOIN j2 USING (xmin);
+-- Test if USING can add all system columns at once
 SELECT *
   FROM j1 JOIN j2 USING (tableoid, xmin, cmin, xmax, cmax, ctid);
-
--- Test using join exceptions
+-- Test USING join exceptions
 SELECT * FROM j1 JOIN j2 USING (id2);
 SELECT * FROM j1 JOIN j2 USING (id1);
 WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
