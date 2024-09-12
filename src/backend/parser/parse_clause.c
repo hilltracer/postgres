@@ -80,7 +80,7 @@ static Var *buildVarFromNSColumn(ParseState *pstate,
 static Var *buildVarFromSystemAttribute(ParseState *pstate,
 										int rtindex, int attnum);
 static void fillNSColumnParametersFromVar(ParseNamespaceColumn *rescolumn,
-										  const Node *colvar);
+										  const Var *colvar);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 								Var *l_colvar, Var *r_colvar);
 static void markRelsAsNulledBy(ParseState *pstate, Node *n, int jindex);
@@ -1345,11 +1345,12 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				}
 
 				/*
-				 * It is important to understand that among the l_colnames or
-				 * r_colnames, there may be a system column name. Since a USING 
-				 * join can be composite, a system column name may appear 
-				 * if it was added in the previous step.
-				 */
+				* It is important to understand that among the l_colnames or
+				* r_colnames there may be a system column name. A system
+				* column name may appear if it was added in the previous step.
+				* This is because a query can contain multiple USING joins,
+				* where each join uses the result of the previous one.
+				*/
 
 				/* Find it in left input */
 				ndx = 0;
@@ -1530,6 +1531,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 														   l_nsitem->p_rtindex,
 														   l_index);
 				}
+
 				if (r_index > 0)
 				{
 					/* User-defined column */
@@ -1566,7 +1568,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					{
 						/* System column, so construct new column. */
 						fillNSColumnParametersFromVar(res_nscolumn,
-											 		  u_colvar);
+											 		  l_colvar);
 					}
 				}
 				else if (u_colvar == (Node *) r_colvar)
@@ -1581,7 +1583,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					{
 						/* System column, so construct new column. */
 						fillNSColumnParametersFromVar(res_nscolumn,
-											 		  u_colvar);
+											 		  r_colvar);
 					}
 				}
 				else
@@ -1749,10 +1751,10 @@ buildVarFromNSColumn(ParseState *pstate, ParseNamespaceColumn *nscol)
 
 /*
  * buildVarFromSystemAttribute -
- *	  build a Var node using "special" attribute, e.g. "xmin".
+ *	  build a Var node using system attribute, e.g. "xmin".
  *
  * rtindex is the relation's index in the rangetable.
- * attnum is the number of "special" attribute.
+ * attnum is the number of system attribute.
  * Returns NULL if there is no such system attribute.
  */
 static Var *
@@ -1787,15 +1789,15 @@ buildVarFromSystemAttribute(ParseState *pstate, int rtindex, int attnum)
  */
 static void
 fillNSColumnParametersFromVar(ParseNamespaceColumn *rescolumn,
-							  const Node *colvar)
+							  const Var *colvar)
 {
-	rescolumn->p_varno = ((Var *) colvar)->varno;
-	rescolumn->p_varattno = ((Var *) colvar)->varattno;
-	rescolumn->p_vartype = exprType(colvar);
-	rescolumn->p_vartypmod = exprTypmod(colvar);
-	rescolumn->p_varcollid = exprCollation(colvar);
-	rescolumn->p_varnosyn = ((Var *) colvar)->varnosyn;
-	rescolumn->p_varattnosyn = ((Var *) colvar)->varattnosyn;
+	rescolumn->p_varno = colvar->varno;
+	rescolumn->p_varattno = colvar->varattno;
+	rescolumn->p_vartype = colvar->vartype;
+	rescolumn->p_vartypmod = colvar->vartypmod;
+	rescolumn->p_varcollid = colvar->varcollid;
+	rescolumn->p_varnosyn = colvar->varnosyn;
+	rescolumn->p_varattnosyn = colvar->varattnosyn;
 }
 
 /*

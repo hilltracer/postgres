@@ -2964,8 +2964,8 @@ RESET enable_seqscan;
 --       1 | T1            101 | T1
 --       2 | T2            102 | T2
 --       3 | T3            103 | T4
-CREATE TABLE j1 (id1 integer);
-CREATE TABLE j2 (id2 integer);
+CREATE TABLE j1 (id1 INT);
+CREATE TABLE j2 (id2 INT);
 BEGIN;
   INSERT INTO j1 (id1) VALUES (1);
   INSERT INTO j2 (id2) VALUES (101);
@@ -3001,10 +3001,8 @@ WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
   SELECT * FROM j1_dubbed JOIN j1 USING (id1);
 WITH j1_dubbed AS (SELECT id1, id1 FROM j1)
   SELECT * FROM j1 JOIN j1_dubbed USING (id1);
--- Test composite USING
-CREATE TABLE j3 (id3 integer);
+-- Test multiple USING joins, each based on the prior result.
+CREATE TABLE j3 (id3 INT);
 SELECT * FROM j1 JOIN j2 USING (xmin) JOIN j3 USING (xmin) LIMIT 0;
 
-DROP TABLE j1;
-DROP TABLE j2;
-DROP TABLE j3;
+DROP TABLE j1, J2, J3;
