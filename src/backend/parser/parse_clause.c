@@ -1782,9 +1782,9 @@ buildVarFromSystemAttribute(ParseState *pstate, int rtindex, int attnum)
 
 /*
  * fillNSColumnParametersFromVar -
- *	  fill NSColumn parameters using Var data.
+ *	  fill ParseNamespaceColumn data using Var data.
  *
- * rescolumn is pointer to the NSColumn structure to be filled.
+ * rescolumn is pointer to the structure to be filled.
  * colvar is the Var where to get data from.
  */
 static void
