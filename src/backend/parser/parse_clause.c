@@ -282,9 +282,9 @@ extractRemainingColumns(ParseState *pstate,
 		if (col_index < 0)
 		{
 			/* 
-			* Attribute number of system column. Don't collect the number
-			* because the name of this column cannot be among src_colnames.
-			*/
+			 * Attribute number of system column. Don't collect the number
+			 * because the name of this column cannot be among src_colnames.
+			 */
 			continue;
 		}
 		prevcols = bms_add_member(prevcols, col_index);
