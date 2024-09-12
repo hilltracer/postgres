@@ -1345,12 +1345,12 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 				}
 
 				/*
-				* It is important to understand that among the l_colnames or
-				* r_colnames there may be a system column name. A system
-				* column name may appear if it was added in the previous step.
-				* This is because a query can contain multiple USING joins,
-				* where each join uses the result of the previous one.
-				*/
+				 * It is important to understand that among the l_colnames or
+				 * r_colnames there may be a system column name. A system
+				 * column name may appear if it was added in the previous step.
+				 * This is because a query can contain multiple USING joins,
+				 * where each join uses the result of the previous one.
+				 */
 
 				/* Find it in left input */
 				ndx = 0;
